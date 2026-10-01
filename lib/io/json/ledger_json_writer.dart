@@ -3,11 +3,13 @@ import 'dart:convert';
 import '../../model/workbook.dart';
 
 class LedgerJsonWriter {
-  static String write(Workbook workbook) {
+  /// Serializes [workbook]. [activeSheetIndex] records which sheet was
+  /// active at save time; the reader restores it on open.
+  static String write(Workbook workbook, {int activeSheetIndex = 0}) {
     final map = {
       'formatVersion': 1,
       'properties': {'modified': DateTime.now().toIso8601String()},
-      'activeSheetIndex': 0,
+      'activeSheetIndex': activeSheetIndex,
       'sheets': [for (final s in workbook.sheets) _sheetJson(s)],
     };
     return const JsonEncoder.withIndent('  ').convert(map);

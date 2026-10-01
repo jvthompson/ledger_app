@@ -103,8 +103,13 @@ class _LedgerHomePageState extends State<LedgerHomePage> with WindowListener {
     if (!await _confirmDiscardIfDirty()) return;
     final path = await FileService.pickOpenPath();
     if (path == null) return;
-    final workbook = await FileService.readWorkbook(path);
-    _session.replaceWorkbook(workbook, filePath: path);
+    try {
+      final workbook = await FileService.readWorkbook(path);
+      _session.replaceWorkbook(workbook, filePath: path);
+    } catch (e) {
+      if (!mounted) return;
+      await _showErrorDialog('Could not open file', '$e');
+    }
   }
 
   Future<void> _handleSave() async {
@@ -113,17 +118,63 @@ class _LedgerHomePageState extends State<LedgerHomePage> with WindowListener {
       await _handleSaveAs();
       return;
     }
-    await FileService.writeWorkbook(_session.controller.workbook, path);
-    _session.markSaved(path);
+    try {
+      await FileService.writeWorkbook(
+        _session.controller.workbook,
+        path,
+        activeSheetIndex: _session.controller.activeSheetIndex,
+      );
+      _session.markSaved(path);
+    } catch (e) {
+      if (!mounted) return;
+      await _showErrorDialog('Could not save file', '$e');
+    }
   }
 
   Future<void> _handleSaveAs() async {
     final path = await FileService.pickSaveAsPath(
-      suggestedName: '${_session.displayName == 'Untitled' ? 'Untitled' : _session.displayName}.ledger',
+      suggestedName: '${_saveBaseName()}.ledger',
     );
     if (path == null) return;
-    await FileService.writeWorkbook(_session.controller.workbook, path);
-    _session.markSaved(path);
+    try {
+      await FileService.writeWorkbook(
+        _session.controller.workbook,
+        path,
+        activeSheetIndex: _session.controller.activeSheetIndex,
+      );
+      _session.markSaved(path);
+    } catch (e) {
+      if (!mounted) return;
+      await _showErrorDialog('Could not save file', '$e');
+    }
+  }
+
+  /// Base file name without any existing `.ledger` extension, so Save As
+  /// on `Report.ledger` suggests `Report.ledger` instead of
+  /// `Report.ledger.ledger`.
+  String _saveBaseName() {
+    final name = _session.displayName;
+    if (name == 'Untitled') return name;
+    const ext = '.ledger';
+    return name.toLowerCase().endsWith(ext)
+        ? name.substring(0, name.length - ext.length)
+        : name;
+  }
+
+  Future<void> _showErrorDialog(String title, String message) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: SelectableText(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleExit() async {

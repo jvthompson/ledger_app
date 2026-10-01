@@ -38,8 +38,31 @@ class FileService {
     return LedgerJsonReader.read(jsonStr);
   }
 
-  static Future<void> writeWorkbook(Workbook workbook, String path) async {
-    final jsonStr = LedgerJsonWriter.write(workbook);
-    await File(path).writeAsString(jsonStr);
+  /// Saves [workbook] atomically: the JSON is written to a temp file first
+  /// and then moved over [path], so a crash or power loss mid-write can
+  /// never leave a truncated workbook behind.
+  static Future<void> writeWorkbook(
+    Workbook workbook,
+    String path, {
+    int activeSheetIndex = 0,
+  }) async {
+    final jsonStr = LedgerJsonWriter.write(
+      workbook,
+      activeSheetIndex: activeSheetIndex,
+    );
+    final tmp = File('$path.tmp');
+    try {
+      await tmp.writeAsString(jsonStr);
+      final target = File(path);
+      if (await target.exists()) await target.delete();
+      await tmp.rename(path);
+    } catch (_) {
+      try {
+        await tmp.delete();
+      } catch (_) {
+        // Best effort cleanup; the original error is what matters.
+      }
+      rethrow;
+    }
   }
 }

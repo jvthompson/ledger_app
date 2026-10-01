@@ -38,6 +38,7 @@ class _SheetGridViewState extends State<SheetGridView> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onControllerChanged);
+    _editController.addListener(_onEditTextChanged);
     _verticalController.addListener(_onScroll);
     _horizontalController.addListener(_onScroll);
   }
@@ -55,6 +56,15 @@ class _SheetGridViewState extends State<SheetGridView> {
 
   void _onScroll() {
     if (mounted) setState(() {});
+  }
+
+  /// Pushes every keystroke into the controller so a click-away can commit
+  /// the in-progress edit instead of silently discarding it.
+  void _onEditTextChanged() {
+    final controller = widget.controller;
+    if (controller.isEditing) {
+      controller.updateEditText(_editController.text);
+    }
   }
 
   void _onControllerChanged() {
